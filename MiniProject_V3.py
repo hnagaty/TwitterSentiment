@@ -39,7 +39,7 @@ print(allTweets.info())
 print("Checking for class balance")
 print(allTweets["Label"].value_counts())
 
-
+#%%
 
 def textVectorize(myText,myVectorizer): 
     from sklearn.model_selection import train_test_split
@@ -49,11 +49,11 @@ def textVectorize(myText,myVectorizer):
     myTrainLabs=ftweetsTrain["Label"]
     myTestVals=ftweetsTest["Value"]
     myTestLabs=ftweetsTest["Label"]    
-    
     vectorizer = myVectorizer.fit(myTrainVals)
     myTrainVec = vectorizer.transform(myTrainVals)
     myTestVec = vectorizer.transform(myTestVals)   
-    return(myTrainVec,myTrainLabs,myTestVec,myTestLabs)
+    myFeatures=vectorizer.get_feature_names()
+    return(myTrainVec,myTrainLabs,myTestVec,myTestLabs,myFeatures)
 
 def plot_confusion_matrix(cm, classes,
                           normalize=False,
@@ -94,7 +94,8 @@ def plot_confusion_matrix(cm, classes,
 def TrainAndTest(myModel,ftrainVec,ftrainLab,ftestVec,ftestLab):
     from sklearn import metrics
 
-    print("\n Fitting & testing a new model ........\n")
+    print("\n\nFitting & testing a new model ........")
+    print("Testing on test split .....")
     print(str(myModel))
     print ("\nNo. of features: %d" %ftrainVec.shape[1])
     print ("Train set: %d" %ftrainVec.shape[0])
@@ -129,12 +130,12 @@ def TrainAndTestCV2(myModel,ftrainVec,ftrainLab):
     print(str(myModel))
     print ("\nNo. of features: %d" %ftrainVec.shape[1])
     print ("Train set: %d" %ftrainVec.shape[0])
-    sc = ['precision_macro', 'recall_macro', 'f1_macro','accuracy']
+    sc = ['precision_weighted', 'recall_weighted', 'f1_weighted','accuracy']
     allScores = cross_validate(myModel, ftrainVec, ftrainLab, cv=10, scoring= sc)  
     predicted = cross_val_predict(myModel, ftrainVec, ftrainLab, cv=10)
     print("\nCross Validation Score:")
     print("Accuracy: %0.2f%% (with sd=%0.2f%%)" % (allScores["test_accuracy"].mean()*100, allScores["test_accuracy"].std()*100))
-    print("F1 Macro: %0.2f%% (with sd=%0.2f%%)" % (allScores["test_f1_macro"].mean()*100, allScores["test_f1_macro"].std()*100))
+    print("F1 Weighted: %0.2f%% (with sd=%0.2f%%)" % (allScores["test_f1_weighted"].mean()*100, allScores["test_f1_weighted"].std()*100))
     print ("\nClassifcation Metrics:")    
     cReport=metrics.classification_report(ftrainLab,predicted)
     print (cReport)
@@ -142,6 +143,8 @@ def TrainAndTestCV2(myModel,ftrainVec,ftrainLab):
     class_names=["negative","neutral","positive"]
     cMatrix=confusion_matrix(ftrainLab,predicted,labels=class_names)
     print(cMatrix)
+    #cm = nltk.ConfusionMatrix(ftrainLab,predicted)
+    #print(cm)
     # Plot non-normalized confusion matrix
     plt.figure()
     plot_confusion_matrix(cMatrix, classes=class_names,
@@ -159,6 +162,15 @@ def tokenize1(text):
         stems.append(PorterStemmer().stem(item))
     return stems
 
+def tokenize2(text):
+    ftokenizer = nltk.casual.TweetTokenizer(preserve_case=False, reduce_len=True)
+    tokens = ftokenizer.tokenize(text)
+    stems = []
+    for item in tokens:
+        stems.append(PorterStemmer().stem(item))
+    return stems
+    
+#%%    
 tokenizer2 = nltk.casual.TweetTokenizer(preserve_case=False, reduce_len=True)
 
 
@@ -166,9 +178,8 @@ tokenizer2 = nltk.casual.TweetTokenizer(preserve_case=False, reduce_len=True)
 from sklearn import naive_bayes
 from sklearn.feature_extraction.text import CountVectorizer
 vectorizer = CountVectorizer(min_df=4, ngram_range=(1, 4))
-trainFeatures=get_feature_names()
 model=naive_bayes.MultinomialNB()
-%time trainVec,trainLab,testVec,testLab=textVectorize(allTweets,vectorizer)
+%time trainVec,trainLab,testVec,testLab,trainFeatures=textVectorize(allTweets,vectorizer)
 %time TrainAndTest(model,trainVec,trainLab,testVec,testLab)
 %time TrainAndTestCV(model,trainVec,trainLab)
 %time TrainAndTestCV2(model,trainVec,trainLab)
@@ -184,19 +195,21 @@ allVectorizers=(vect1,vect2,vect3,vect4)
 for testVect in allVectorizers:
     print("\n\n\nTesting another Vectorizer")
     print(testVect)
-    trainVec,trainLab,testVec,testLab=textVectorize(allTweets,testVect)
+    trainVec,trainLab,testVec,testLab,trainFeatures=textVectorize(allTweets,testVect)
     TrainAndTest(model,trainVec,trainLab,testVec,testLab)
 
-
+#%%
 # Testing other settings for vect3 (as it was the one with the best results)
 print("\n\nA new run:")
-vect3 = CountVectorizer(tokenizer=tokenizer2.tokenize,min_df=2)   
-trainVec,trainLab,testVec,testLab=textVectorize(allTweets,vect3)
+#vect3 = CountVectorizer(tokenizer=tokenizer2.tokenize,min_df=2,stop_words="english")   
+vect3 = CountVectorizer(tokenizer=tokenize2,min_df=2,stop_words="english")
+model=naive_bayes.MultinomialNB()
+trainVec,trainLab,testVec,testLab,trainFeatures=textVectorize(allTweets,vect3)
+#%time TrainAndTestCV(model,trainVec,trainLab)
+TrainAndTestCV2(model,trainVec,trainLab)
 TrainAndTest(model,trainVec,trainLab,testVec,testLab)
-%time TrainAndTest(model,trainVec,trainLab,testVec,testLab)
-%time TrainAndTestCV(model,trainVec,trainLab)
-%time TrainAndTestCV2(model,trainVec,trainLab)
 
+#%%
 # Take care of emoticons & other characters
 # It reduced the accuracy
 # Most probably because a tweeter tokenizer is already used
@@ -205,40 +218,42 @@ allTweets.replace(unicodeDict,inplace=True,regex=True)
 trainVec,trainLab,testVec,testLab=textVectorize(allTweets,vect3)
 TrainAndTest(model,trainVec,trainLab,testVec,testLab)
 
+#%%
 from sklearn.model_selection import cross_val_score
 trainVec,trainLab,testVec,testLab=textVectorize(allTweets)
 testmodel = naive_bayes.MultinomialNB()
 print("\n\n\n CV for a test model ....\n")
 print(str(testmodel))
 score=cross_val_score(testmodel,trainVec,trainLab,cv=10)
-fscore = cross_val_score(testmodel,trainVec,trainLab,cv=10, scoring='f1_macro'  )
+fscore = cross_val_score(testmodel,trainVec,trainLab,cv=10, scoring='f1_weighted'  )
 print("Accuracy: %0.2f%% (with sd=%0.2f%%)" % (score.mean()*100, score.std()*100))
 print("F1: %0.2f%% (with sd=%0.2f%%)" % (fscore.mean()*100, fscore.std()*100))
 
 TrainAndTest(testmodel,trainVec,trainLab,testVec,testLab)
 
-
+#%%
 # reducing features using chi2 metric
 from sklearn.feature_selection import chi2
 from scipy.stats import describe
-print("\n\n\nReduing no. of features.....")
-vect3 = CountVectorizer(tokenizer=tokenizer2.tokenize,min_df=2)   
-trainVec,trainLab,testVec,testLab=textVectorize(allTweets,vect3)
+print("\n\n\nReducing no. of features.....")
+vect3 = CountVectorizer(tokenizer=tokenize2,min_df=2,stop_words="english")  
+trainVec,trainLab,testVec,testLab,trainFeatures=textVectorize(allTweets,vect3)
 chiVals=chi2(trainVec,trainLab)
 print(describe(chiVals[0]))
 chiFilter=chiVals[1]<0.15  # select features with p<5%
 reducedTrainVec=trainVec[:,chiFilter]
 reducedTestVec=testVec[:,chiFilter]
-%time TrainAndTest(model,reducedTrainVec,trainLab,reducedTestVec,testLab)
-%time TrainAndTestCV(model,reducedTrainVec,trainLab)
-%time TrainAndTestCV2(model,reducedTrainVec,trainLab)
-
+reducedFeatures=np.array(trainFeatures)[chiFilter].tolist()
+#%time TrainAndTestCV(model,reducedTrainVec,trainLab)
+TrainAndTestCV2(model,reducedTrainVec,trainLab)
+TrainAndTest(model,reducedTrainVec,trainLab,reducedTestVec,testLab)
+#%%
 
 #Testing various models
 testModel1 = sklearn.naive_bayes.MultinomialNB()
 testModel2 = sklearn.svm.SVC(kernel="linear")
 testModel3 = sklearn.svm.SVC(kernel="rbf")
-testModel4 = sklearn.linear_model.LogisticRegression
+testModel4 = sklearn.linear_model.LogisticRegression(class_weight="balanced")
 #testModel5=descision tree
 allModels=[testModel1,testModel2,testModel3,testModel4]
 
@@ -254,8 +269,8 @@ from sklearn.svm import SVC
 tuned_parameters = [{'kernel': ['rbf'], 'gamma': [1e-3, 1e-4],
                      'C': [1, 10, 100, 1000]},
                     {'kernel': ['linear'], 'C': [1, 10, 100, 1000]}]
-clf = GridSearchCV(SVC(), tuned_parameters, cv=10,scoring='f1_macro')
-clf.fit(reducedTrainVec,trainLab)
+clf = GridSearchCV(SVC(), tuned_parameters, cv=10,scoring='f1_weighted')
+%time clf.fit(reducedTrainVec,trainLab)
 print("Best parameters set found on development set:")
 print()
 print(clf.best_params_)
@@ -277,3 +292,16 @@ print(classification_report(y_true, y_pred))
 print()
 
 
+#%%
+#read the Kaggle test data
+KaggleTestTweets = pd.read_table("../new_english_test.csv",sep=",")
+tweets=KaggleTestTweets["tweet"]
+ids=KaggleTestTweets["id"]
+unicodeDict={"\\\\u002c":",",
+             "\\\\u2019":"'"}
+tweets.replace(unicodeDict,inplace=True,regex=True)
+tweetsVec=vect3.transform(tweets)
+reducedTweetsVec=tweetsVec[:,chiFilter]
+PredictedSentiment=model.predict(reducedTweetsVec)
+PredictedPD = pd.DataFrame(list(zip(ids,PredictedSentiment)),columns=["id","sentiment"])
+PredictedPD.to_csv("outfile.csv",index=False)
