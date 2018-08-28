@@ -179,7 +179,7 @@ from sklearn import naive_bayes
 from sklearn.feature_extraction.text import CountVectorizer
 vectorizer = CountVectorizer(min_df=4, ngram_range=(1, 4))
 model=naive_bayes.MultinomialNB()
-%time trainVec,trainLab,testVec,testLab,trainFeatures=textVectorize(allTweets,vectorizer)
+trainVec,trainLab,testVec,testLab,trainFeatures=textVectorize(allTweets,vectorizer)
 %time TrainAndTest(model,trainVec,trainLab,testVec,testLab)
 %time TrainAndTestCV(model,trainVec,trainLab)
 %time TrainAndTestCV2(model,trainVec,trainLab)
@@ -200,6 +200,8 @@ for testVect in allVectorizers:
 
 #%%
 # Testing other settings for vect3 (as it was the one with the best results)
+from sklearn import naive_bayes
+from sklearn.feature_extraction.text import CountVectorizer
 print("\n\nA new run:")
 #vect3 = CountVectorizer(tokenizer=tokenizer2.tokenize,min_df=2,stop_words="english")   
 vect3 = CountVectorizer(tokenizer=tokenize2,min_df=2,stop_words="english")
@@ -213,9 +215,9 @@ TrainAndTest(model,trainVec,trainLab,testVec,testLab)
 # Take care of emoticons & other characters
 # It reduced the accuracy
 # Most probably because a tweeter tokenizer is already used
-unicodeDict={"\\\\u002c":",","\\\\u2019":"'",":\)":" smile ",";\)":" smile ",":D":" laugh ",":\(":" sad "}
+unicodeDict={"\\\\u002c":",","\\\\u2019":"'",":\)":" emotsmile ",";\)":" emotsmile ",":D":" emotsmile ",":\(":" emotsad "}
 allTweets.replace(unicodeDict,inplace=True,regex=True)
-trainVec,trainLab,testVec,testLab=textVectorize(allTweets,vect3)
+trainVec,trainLab,testVec,testLab,tainFeatures=textVectorize(allTweets,vect3)
 TrainAndTest(model,trainVec,trainLab,testVec,testLab)
 
 #%%
@@ -253,7 +255,7 @@ TrainAndTest(model,reducedTrainVec,trainLab,reducedTestVec,testLab)
 testModel1 = sklearn.naive_bayes.MultinomialNB()
 testModel2 = sklearn.svm.SVC(kernel="linear")
 testModel3 = sklearn.svm.SVC(kernel="rbf")
-testModel4 = sklearn.linear_model.LogisticRegression(class_weight="balanced")
+testModel4 = sklearn.linear_model.LogisticRegression(class_weight="balanced",C=0.3)
 #testModel5=descision tree
 allModels=[testModel1,testModel2,testModel3,testModel4]
 
